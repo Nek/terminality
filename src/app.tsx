@@ -172,12 +172,11 @@ function interpretPart(
 function walkPath(
   path: string,
   currentDirectory: string[],
-  previousDirectory: string[] | null
 ): string[] | "error" {
   const parts = path.split("/").filter((s) => "" !== s);
   let newDirectory: string[] = [...currentDirectory];
   for (let part of parts) {
-    const { nextAction } = interpretPart(part, newDirectory, previousDirectory);
+    const { nextAction } = interpretPart(part, newDirectory);
     if (nextAction === "done") {
       break;
     }
@@ -247,12 +246,6 @@ export function App() {
         if (newDirectoryOrError !== "error") {
           const fullPathToDir = getFullPathToDir(newDirectoryOrError);
           const directoryExists = pathOr($state.root, fullPathToDir, false);
-          console.log(
-            "!!!!",
-            newDirectoryOrError,
-            fullPathToDir,
-            newDirectoryOrError
-          );
           if (directoryExists) {
             const temp = $state.currentDirectory;
             $state.currentDirectory = newDirectoryOrError;
