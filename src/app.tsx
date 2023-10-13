@@ -114,9 +114,9 @@ function getFullPathToDir(dir: ("children" | string)[]) {
   ];
 }
 
-const NodeView = ({ name, type }: { name: string; type: NodeType }) => {
+const NodeView = ({ name, type, currentDirectory }: { name: string; type: NodeType, currentDirectory: readonly string[] }) => {
   const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
-
+  console.log(currentDirectory)
   switch (type) {
     case NodeType.TEXT:
     case NodeType.CHART:
@@ -126,7 +126,7 @@ const NodeView = ({ name, type }: { name: string; type: NodeType }) => {
       return (
         <div
           onClick={() => {
-            setEditorInput("cd " + name);
+            setEditorInput(`cd ${currentDirectory.join("/")}/${name}`);
             setProcessCurrentLine(true);
           }}
           id={name}
@@ -142,11 +142,10 @@ type Command = (prompt?: string) => JSX.Element[] | string | undefined;
 
 function interpretPart(
   part: string,
-  newDirectory: string[],
+  newDirectory: string[]
 ): {
   nextAction: "next-part" | "done" | "error";
 } {
-  console.log(part);
   switch (part) {
     case SPECIAL_SYMBOLS.HOME:
       newDirectory.splice(0, Infinity, SPECIAL_SYMBOLS.HOME);
@@ -191,6 +190,7 @@ function walkPath(
 
 export function App() {
   const $state = useProxy(state);
+  const snap = snapshot(state)
 
   // Define commands here
   const commands: { [name in CommandNames]: Command } = {
@@ -218,7 +218,7 @@ export function App() {
           $state.currentDirectory.length === 1
             ? nameNodePairs
             : [["..", NodeType.DIRECTORY], ...nameNodePairs];
-        return dirs.map(([name, type]) => <NodeView name={name} type={type} />);
+        return dirs.map(([name, type]) => <NodeView currentDirectory={snap.currentDirectory} name={name} type={type} />);
       }
     },
     cd: (path?: string) => {
@@ -247,7 +247,12 @@ export function App() {
         if (newDirectoryOrError !== "error") {
           const fullPathToDir = getFullPathToDir(newDirectoryOrError);
           const directoryExists = pathOr($state.root, fullPathToDir, false);
-          console.log("!!!!", newDirectoryOrError, fullPathToDir, newDirectoryOrError)
+          console.log(
+            "!!!!",
+            newDirectoryOrError,
+            fullPathToDir,
+            newDirectoryOrError
+          );
           if (directoryExists) {
             const temp = $state.currentDirectory;
             $state.currentDirectory = newDirectoryOrError;
