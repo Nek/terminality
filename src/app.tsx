@@ -257,47 +257,6 @@ export function App() {
         }
         return `Error: directory "${path}" doesn't exist.`;
       }
-      // switch (path) {
-      //   case SPECIAL_SYMBOLS.HOME:
-      //     if (
-      //       $state.currentDirectory[$state.currentDirectory.length - 1] ==
-      //       SPECIAL_SYMBOLS.HOME
-      //     ) {
-      //       break;
-      //     }
-      //     const temp = $state.currentDirectory;
-      //     $state.currentDirectory = [SPECIAL_SYMBOLS.HOME];
-      //     $state.previousDirectory = temp;
-      //     break;
-      //   case SPECIAL_SYMBOLS.PREVIOUS:
-      //     if ($state.previousDirectory) {
-      //       const temp = $state.currentDirectory;
-      //       $state.currentDirectory = $state.previousDirectory;
-      //       $state.previousDirectory = temp;
-      //     }
-      //     break;
-      //   case SPECIAL_SYMBOLS.UP:
-      //     if ($state.currentDirectory.length > 1) {
-      //       const temp = $state.currentDirectory;
-      //       $state.currentDirectory = $state.currentDirectory.slice(0, -1);
-      //       $state.previousDirectory = temp;
-      //     }
-      //     break;
-      //   default:
-      //     const fullPathToDir = getFullPathToDir([
-      //       ...$state.currentDirectory,
-      //       path,
-      //     ]);
-      //     const newDir = pathOr($state.root, fullPathToDir, null);
-      //     if (newDir !== null) {
-      //       const temp = $state.currentDirectory;
-      //       $state.currentDirectory = [...$state.currentDirectory, path];
-      //       $state.previousDirectory = temp;
-      //     } else {
-      //       return `Error: directory "${path}" doesn't exist.`;
-      //     }
-      //     break;
-      // }
     },
   };
 
