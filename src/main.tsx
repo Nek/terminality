@@ -1,11 +1,10 @@
-import { render } from "preact";
+import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import "./index.css";
 import { TerminalContextProvider } from "react-terminal";
-
-render(
+const root = createRoot(document.getElementById("app")!);
+root.render(
   <TerminalContextProvider>
-    <App />
-  </TerminalContextProvider>,
-  document.getElementById("app")!
+    <App  />
+  </TerminalContextProvider>
 );

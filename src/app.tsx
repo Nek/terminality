@@ -1,5 +1,5 @@
-import { ReactTerminal } from "react-terminal";
-import { proxy } from "valtio";
+import { ReactTerminal, useEditorCommands } from "react-terminal";
+import { proxy, snapshot } from "valtio";
 import { useProxy } from "valtio/utils";
 import { flatten, pathOr, zip } from "remeda";
 
@@ -14,11 +14,16 @@ enum NodeType {
   IMAGE,
 }
 
+const COMMANDS = ["ls", "cd"] as const;
+type CommandNames = (typeof COMMANDS)[number];
+
 type Name = string;
+type DirChildren = {
+  [name in Name]: File | Directory;
+};
+
 type Directory = FileSystemNode<NodeType.DIRECTORY> & {
-  children: {
-    [name in Name]: File | Directory;
-  };
+  children: DirChildren;
 };
 type TextFile = FileSystemNode<NodeType.TEXT> & {
   contents: string;
@@ -97,7 +102,7 @@ const state = proxy<Store>({
   previousDirectory: null,
 });
 
-function getFullPathToDir(dir: string[]) {
+function getFullPathToDir(dir: ("children" | string)[]) {
   return [
     "children",
     ...flatten(
@@ -109,91 +114,212 @@ function getFullPathToDir(dir: string[]) {
   ];
 }
 
-const NodeView = ({name, type}: {name: string, type: NodeType}) => {
+const NodeView = ({ name, type }: { name: string; type: NodeType }) => {
+  const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
+
   switch (type) {
     case NodeType.TEXT:
     case NodeType.CHART:
     case NodeType.IMAGE:
-      return <div>{name}</div>;
+      return <div id={name}>{name}</div>;
     default:
-      return <div style={"font-weight: bold;"}>{name}</div>;
-  } 
+      return (
+        <div
+          onClick={() => {
+            setEditorInput("cd " + name);
+            setProcessCurrentLine(true);
+          }}
+          id={name}
+          style={{ fontWeight: "bold" }}
+        >
+          {name}
+        </div>
+      );
+  }
+};
+
+type Command = (prompt?: string) => JSX.Element[] | string | undefined;
+
+function interpretPart(
+  part: string,
+  newDirectory: string[],
+): {
+  nextAction: "next-part" | "done" | "error";
+} {
+  console.log(part);
+  switch (part) {
+    case SPECIAL_SYMBOLS.HOME:
+      newDirectory.splice(0, Infinity, SPECIAL_SYMBOLS.HOME);
+      return {
+        nextAction: "next-part",
+      };
+    case SPECIAL_SYMBOLS.UP:
+      newDirectory.pop();
+      return {
+        nextAction: "next-part",
+      };
+    case SPECIAL_SYMBOLS.PREVIOUS:
+      return {
+        nextAction: "error",
+      };
+    default:
+      newDirectory.push(part);
+      return {
+        nextAction: "next-part",
+      };
+  }
+}
+
+function walkPath(
+  path: string,
+  currentDirectory: string[],
+  previousDirectory: string[] | null
+): string[] | "error" {
+  const parts = path.split("/").filter((s) => "" !== s);
+  let newDirectory: string[] = [...currentDirectory];
+  for (let part of parts) {
+    const { nextAction } = interpretPart(part, newDirectory, previousDirectory);
+    if (nextAction === "done") {
+      break;
+    }
+    if (nextAction === "error") {
+      return "error";
+    }
+  }
+  return newDirectory;
 }
 
 export function App() {
   const $state = useProxy(state);
+
   // Define commands here
-  const commands = {
+  const commands: { [name in CommandNames]: Command } = {
     ls: () => {
-      const pathToCurrentDir = getFullPathToDir($state.currentDirectory)
-      const currentDirChildren = pathOr($state.root, [...pathToCurrentDir, "children"], null)
+      const pathToCurrentDir = getFullPathToDir($state.currentDirectory);
+      const currentDirChildren: DirChildren | null = pathOr<
+        Directory,
+        keyof Directory
+      >($state.root, [...pathToCurrentDir, "children"], null);
       if (currentDirChildren !== null) {
-        const nameNodePairs = Object.entries(currentDirChildren).sort(([a], [b]) => {
-          if (a < b) {
-            return -1;
-          }
-          if (a > b) {
-            return 1;
-          }
-          return 0;
-        }).map(([name, node]) => [name, node.type]);
-        const dirs =  $state.currentDirectory.length === 1 ? nameNodePairs : [['..', NodeType.DIRECTORY], ...nameNodePairs];
-        return dirs.map(([name, type]) => <NodeView name={name} type={type} />)
+        const nameNodePairs = Object.entries<[string, File | Directory]>(
+          currentDirChildren
+        )
+          .sort(([a], [b]) => {
+            if (a < b) {
+              return -1;
+            }
+            if (a > b) {
+              return 1;
+            }
+            return 0;
+          })
+          .map(([name, node]) => [name, node.type]);
+        const dirs =
+          $state.currentDirectory.length === 1
+            ? nameNodePairs
+            : [["..", NodeType.DIRECTORY], ...nameNodePairs];
+        return dirs.map(([name, type]) => <NodeView name={name} type={type} />);
       }
     },
-    cd: (directory: string | SPECIAL_SYMBOLS) => {
-      switch (directory) {
-        case SPECIAL_SYMBOLS.HOME:
-          if (
-            $state.currentDirectory[$state.currentDirectory.length - 1] ==
-            SPECIAL_SYMBOLS.HOME
-          ) {
-            break;
-          }
+    cd: (path?: string) => {
+      if (path === SPECIAL_SYMBOLS.PREVIOUS) {
+        if ($state.previousDirectory) {
+          const temp = $state.currentDirectory;
+          $state.currentDirectory = $state.previousDirectory;
+          $state.previousDirectory = temp;
+        }
+        return undefined;
+      }
+      if (path === SPECIAL_SYMBOLS.HOME) {
+        if ($state.previousDirectory) {
           const temp = $state.currentDirectory;
           $state.currentDirectory = [SPECIAL_SYMBOLS.HOME];
           $state.previousDirectory = temp;
-          break;
-        case SPECIAL_SYMBOLS.PREVIOUS:
-          if ($state.previousDirectory) {
-            const temp = $state.currentDirectory;
-            $state.currentDirectory = $state.previousDirectory;
-            $state.previousDirectory = temp;
-          }
-          break;
-        case SPECIAL_SYMBOLS.UP:
-          if ($state.currentDirectory.length > 1) {
-            const temp = $state.currentDirectory;
-            $state.currentDirectory = $state.currentDirectory.slice(0, -1);
-            $state.previousDirectory = temp;
-          }
-          break;
-        default:
-          const fullPathToDir = getFullPathToDir([
-            ...$state.currentDirectory,
-            directory,
-          ]);
-          console.log(fullPathToDir);
-          const newDir = pathOr($state.root, fullPathToDir, null);
-          console.log(newDir);
-          if (newDir !== null) {
-            const temp = $state.currentDirectory;
-            $state.currentDirectory = [...$state.currentDirectory, directory];
-            $state.previousDirectory = temp;
-          } else {
-            return `Error: directory "${directory}" doesn't exist.`;
-          }
-          // console.log(Object.entries(temp).filter(([_name, node]) => node.type == NodeType.DIRECTORY))
-          // const temp = pick($state.currentDirectory)
-          break;
+        }
+        return undefined;
       }
-      return "";
+      if (path) {
+        const newDirectoryOrError = walkPath(
+          path,
+          $state.currentDirectory,
+          $state.previousDirectory
+        );
+        if (newDirectoryOrError !== "error") {
+          const fullPathToDir = getFullPathToDir(newDirectoryOrError);
+          const directoryExists = pathOr($state.root, fullPathToDir, false);
+          console.log("!!!!", newDirectoryOrError, fullPathToDir, newDirectoryOrError)
+          if (directoryExists) {
+            const temp = $state.currentDirectory;
+            $state.currentDirectory = newDirectoryOrError;
+            $state.previousDirectory = temp;
+            return undefined;
+          }
+        }
+        return `Error: directory "${path}" doesn't exist.`;
+      }
+      // switch (path) {
+      //   case SPECIAL_SYMBOLS.HOME:
+      //     if (
+      //       $state.currentDirectory[$state.currentDirectory.length - 1] ==
+      //       SPECIAL_SYMBOLS.HOME
+      //     ) {
+      //       break;
+      //     }
+      //     const temp = $state.currentDirectory;
+      //     $state.currentDirectory = [SPECIAL_SYMBOLS.HOME];
+      //     $state.previousDirectory = temp;
+      //     break;
+      //   case SPECIAL_SYMBOLS.PREVIOUS:
+      //     if ($state.previousDirectory) {
+      //       const temp = $state.currentDirectory;
+      //       $state.currentDirectory = $state.previousDirectory;
+      //       $state.previousDirectory = temp;
+      //     }
+      //     break;
+      //   case SPECIAL_SYMBOLS.UP:
+      //     if ($state.currentDirectory.length > 1) {
+      //       const temp = $state.currentDirectory;
+      //       $state.currentDirectory = $state.currentDirectory.slice(0, -1);
+      //       $state.previousDirectory = temp;
+      //     }
+      //     break;
+      //   default:
+      //     const fullPathToDir = getFullPathToDir([
+      //       ...$state.currentDirectory,
+      //       path,
+      //     ]);
+      //     const newDir = pathOr($state.root, fullPathToDir, null);
+      //     if (newDir !== null) {
+      //       const temp = $state.currentDirectory;
+      //       $state.currentDirectory = [...$state.currentDirectory, path];
+      //       $state.previousDirectory = temp;
+      //     } else {
+      //       return `Error: directory "${path}" doesn't exist.`;
+      //     }
+      //     break;
+      // }
     },
   };
+
+  const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
 
   const prompt = [...$state.currentDirectory].join("/") + ">";
 
   return (
-    <ReactTerminal showControlBar={false} commands={commands} prompt={prompt} />
+    <>
+      <button
+        onClick={() => {
+          setEditorInput("ls");
+          setProcessCurrentLine(true);
+        }}
+      >
+        ls
+      </button>
+      <ReactTerminal
+        showControlBar={false}
+        commands={commands}
+        prompt={prompt}
+      />
+    </>
   );
 }
