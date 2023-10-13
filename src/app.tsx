@@ -14,7 +14,7 @@ enum NodeType {
   IMAGE,
 }
 
-const COMMANDS = ["ls", "cd"] as const;
+const COMMANDS = ["ls", "cd", "help"] as const;
 type CommandNames = (typeof COMMANDS)[number];
 
 type Name = string;
@@ -116,12 +116,11 @@ function getFullPathToDir(dir: ("children" | string)[]) {
 
 const NodeView = ({ name, type, currentDirectory }: { name: string; type: NodeType, currentDirectory: readonly string[] }) => {
   const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
-  console.log(currentDirectory)
   switch (type) {
     case NodeType.TEXT:
     case NodeType.CHART:
     case NodeType.IMAGE:
-      return <div id={name}>{name}</div>;
+      return <div  style={{ fontWeight: "200" }} id={name}>{name}</div>;
     default:
       return (
         <div
@@ -130,7 +129,7 @@ const NodeView = ({ name, type, currentDirectory }: { name: string; type: NodeTy
             setProcessCurrentLine(true);
           }}
           id={name}
-          style={{ fontWeight: "bold" }}
+          style={{ fontWeight: "400" }}
         >
           {name}
         </div>
@@ -138,7 +137,7 @@ const NodeView = ({ name, type, currentDirectory }: { name: string; type: NodeTy
   }
 };
 
-type Command = (prompt?: string) => JSX.Element[] | string | undefined;
+type Command = (prompt?: string) => JSX.Element[] | JSX.Element | string | undefined;
 
 function interpretPart(
   part: string,
@@ -193,6 +192,21 @@ export function App() {
 
   // Define commands here
   const commands: { [name in CommandNames]: Command } = {
+    help: (topic: string) => {
+      if (topic === "cd") {
+        return  <>
+        <p>cd: change directory</p>
+        <p>special directory names</p>
+        <p>~ change to home</p>
+        <p>.. change to one level up</p> 
+        <p>- change to the previous directory</p>
+      </>
+      }
+      return <>
+        <p>ls: list directory</p>
+        <p>cd: change directory</p>
+      </>
+    },
     ls: () => {
       const pathToCurrentDir = getFullPathToDir($state.currentDirectory);
       const currentDirChildren: DirChildren | null = pathOr<
@@ -258,21 +272,22 @@ export function App() {
     },
   };
 
-  const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
+  // const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
 
   const prompt = [...$state.currentDirectory].join("/") + ">";
 
   return (
     <>
-      <button
+      {/* <button
         onClick={() => {
           setEditorInput("ls");
           setProcessCurrentLine(true);
         }}
       >
         ls
-      </button>
+      </button> */}
       <ReactTerminal
+        theme='dracula'
         showControlBar={false}
         commands={commands}
         prompt={prompt}
