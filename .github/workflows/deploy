@@ -5,23 +5,19 @@ on:
       - main
 permissions:
   contents: write
+
+
 jobs:
-  build-and-deploy:
-    concurrency: ci-${{ github.ref }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v3
-
-      - name: Install dependencies
-        run: |
-          npm install
-
-      - name: Install and Build 🔧
-        run: |
-          npm run build
-
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: dist
+build-and-start:
+  runs-on: ubuntu-latest # Linux base image
+  steps:
+    - uses: actions/checkout@v3 # Checkout repo
+    - uses: oven-sh/setup-bun@v1 # Setup bun
+      with:
+          bun-version: latest # You can also use a specific version
+    - run: bun install # Only needed if you have any dependencies
+    - run: bun run build # Change to your entrypoint!
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: dist
