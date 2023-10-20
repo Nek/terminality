@@ -1,41 +1,12 @@
 import { ReTerminal, useEditorCommands } from "re-terminal";
 import { proxy, snapshot } from "valtio";
 import { useProxy } from "valtio/utils";
-import { flatten, getOr, pathOr, zip } from "lodash/fp";
-// import { Directory } from "./spec";
-
-import {
-  assert,
-  object,
-  string,
-  array,
-  lazy,
-  record,
-  union,
-  nullable,
-  is,
-} from "superstruct";
+import ReactPlayer from "react-player";
+import { useState } from "react";
 import { get } from "lodash";
+import { assert, is } from "superstruct";
 
-export const TextFile = object({
-  contents: string(),
-});
-
-export const VideoFile = object({
-  url: string(),
-});
-
-export const ChartFile = object({
-  title: string(),
-  data: string(),
-});
-
-const File = union([TextFile, VideoFile, ChartFile])
-
-export const Directory = record(
-  string(),
-  lazy(() => union([TextFile, VideoFile, ChartFile, Directory]))
-);
+import { File, Directory, StoreStruct, VideoFile, Commands, TextFile} from "./spec";
 
 const SPECIAL_SYMBOLS = {
   HOME: "~",
@@ -45,8 +16,14 @@ const SPECIAL_SYMBOLS = {
 
 const root = {
   [SPECIAL_SYMBOLS.HOME]: {
+    "bubbly-bobbles.mov": {
+      url: "https://vimeo.com/734325235",
+    },
+    "flowy-cubes.mov": {
+      url: "https://vimeo.com/734324970",
+    },
     "about.txt": {
-      contents: "Hello world!",
+      contents: "Definitely a software developer. Absolutely a musician. Certainly a curious mind!",
     },
     projects: {
       "project-1.txt": {
@@ -74,12 +51,6 @@ const root = {
 
 assert(root, Directory);
 
-const StoreStruct = object({
-  root: Directory,
-  currentDirectory: array(string()),
-  previousDirectory: nullable(array(string())),
-});
-
 const state = proxy({
   root,
   currentDirectory: [SPECIAL_SYMBOLS.HOME],
@@ -88,25 +59,14 @@ const state = proxy({
 
 assert(state, StoreStruct);
 
-function getFullPathToDir(dir) {
-  return [
-    ...flatten(
-      zip(
-        dir,
-        dir.map((_) => "children")
-      )
-    ).slice(0, -1),
-  ];
-}
-
 const NodeView = ({ name, node, currentDirectory }) => {
   const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
-  if(is(node, File)) {
+  if (is(node, File)) {
     return (
       <div style={{ fontWeight: "200" }} key={name} id={name}>
         {name}
       </div>
-    )
+    );
   }
   return (
     <div
@@ -162,23 +122,55 @@ function walkPath(path, currentDirectory) {
   return newDirectory;
 }
 
+function PausableVideo({ url }) {
+  const [playing, setPlaying] = useState(true);
+  return (
+    <div onClick={() => setPlaying(!playing)}>
+      <ReactPlayer url={url} playing={true} controls={true} />
+    </div>
+  );
+}
+
 export function App() {
   const $state = useProxy(state);
   const snap = snapshot(state);
 
   // Define commands here
   const commands = {
-    // open: (file: string) => {
-    //   // check if file exists
-    //   // check if it's video
-    //   // open
-    //   // otherwise error
-    //   const maybeFile = pathOr<
-    //     DivineDirectory,
-    //     keyof DivineDirectory
-    //   >($state.root, [...snap.currentDirectory, "children"], null);
-
-    // },
+    open: (name) => {
+      // check if file exists
+      // check if it's video
+      // open
+      // otherwise error
+      const file = get($state.root, [...snap.currentDirectory, name]);
+      if (file) {
+        if (is(file, VideoFile)) {
+          return <PausableVideo url={file.url} />;
+        } else {
+          return "File type isn't supported yet.";
+        }
+      } else {
+        return "No such file!";
+      }
+    },
+    less: (name) => {
+      // check if file exists
+      // check if it's video
+      // open
+      // otherwise error
+      const file = get($state.root, [...snap.currentDirectory, name]);
+      if (file) {
+        if (is(file, TextFile)) {
+          return <div style={{ fontWeight: "200" }} key={name} id={name}>
+          {file.contents}
+        </div>;
+        } else {
+          return "File type isn't supported yet.";
+        }
+      } else {
+        return "No such file!";
+      }
+    },
     help: (prompt) => {
       if (prompt === "cd") {
         return (
@@ -199,7 +191,11 @@ export function App() {
       );
     },
     ls: () => {
-      const currentDirChildren = get($state.root,$state.currentDirectory, null);
+      const currentDirChildren = get(
+        $state.root,
+        $state.currentDirectory,
+        null
+      );
       if (currentDirChildren !== null) {
         const nameNodePairs = Object.entries(currentDirChildren)
           .sort(([a], [b]) => {
@@ -216,7 +212,6 @@ export function App() {
           $state.currentDirectory.length === 1
             ? nameNodePairs
             : ["..", ...nameNodePairs];
-            console.log(nameNodePairs)
         return dirs.map(([name, node]) => (
           <NodeView
             currentDirectory={snap.currentDirectory}
@@ -250,8 +245,7 @@ export function App() {
           $state.previousDirectory
         );
         if (newDirectoryOrError !== "error") {
-          const fullPathToDir = getFullPathToDir(newDirectoryOrError);
-          const directoryExists = pathOr($state.root, fullPathToDir, false);
+          const directoryExists = get($state.root, newDirectoryOrError, false);
           if (directoryExists) {
             const temp = $state.currentDirectory;
             $state.currentDirectory = newDirectoryOrError;
@@ -263,6 +257,8 @@ export function App() {
       }
     },
   };
+
+  assert(commands, Commands);
 
   // const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
 
