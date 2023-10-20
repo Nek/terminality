@@ -1,19 +1,21 @@
 import { ReTerminal, useEditorCommands } from "re-terminal";
-import { proxy, snapshot } from "valtio";
+import { proxy, snapshot, ref } from "valtio";
 import { useProxy } from "valtio/utils";
 import ReactPlayer from "react-player/vimeo";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import get from "lodash/get";
 import { assert, is } from "superstruct";
-
 import {
   File,
   Directory,
-  StoreStruct,
+  State,
   VideoFile,
   Commands,
   TextFile,
+  ChartFile,
 } from "./spec";
+
+import RadarChart from "react-svg-radar-chart";
 
 const SPECIAL_SYMBOLS = {
   HOME: "~",
@@ -35,7 +37,7 @@ const root = {
     },
     "who-am-i.txt": {
       contents:
-        "Definitely a software developer. Undoubtedly a musician. Always a curious mind!",
+        "Definitely a software developer. Undoubtedly a musician. Always a curious mind! The name is Nikita Dudnik.",
     },
     // projects: {
     //   "project-1.txt": {
@@ -51,11 +53,57 @@ const root = {
     expertise: {
       "programming-languages.chart": {
         title: "Programming Languages",
-        data: "",
+        captions: ref({
+          ts: "TypeScript",
+          js: "JavaScript",
+          cjs: "Clojure/Script",
+          lua: "Lua",
+          py: "Python",
+          hx: "Haxe",
+          cpp: "C++",
+          as: "ActionScript",
+        }),
+        data: ref([
+          {
+            data: {
+              ts: 1,
+              js: 1,
+              cjs: 0.6,
+              lua: 0.4,
+              py: 0.3,
+              hx: 0.5,
+              cpp: 0.2,
+              as: 0.7,
+            },
+            meta: { color: "red" },
+          },
+        ]),
       },
       "programming-paradigms.chart": {
         title: "Programming Paradigms",
-        data: "",
+        captions: ref({
+          p: "Procedural",
+          oop: "Object Oriented",
+          fn: "Functional",
+          l: "Logic",
+          r: "Reactive",
+          d: "Dataflow",
+          s: "Stack-based",
+        }),
+        data: ref([
+          {
+            data: {
+              p: 0.8,
+              oop: 0.8,
+              fn: 1,
+              l: 0.4,
+              r: 0.8,
+              d: 0.7,
+              s: 0.2,
+            },
+            meta: { color: "red" },
+          },
+        ]),
       },
     },
   },
@@ -69,7 +117,7 @@ const state = proxy({
   previousDirectory: null,
 });
 
-assert(state, StoreStruct);
+assert(state, State);
 
 const NodeView = ({ name, node, currentDirectory }) => {
   const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
@@ -155,6 +203,18 @@ export function App() {
         if (file) {
           if (is(file, VideoFile)) {
             return <PausableVideo url={file.url} />;
+          } else if (is(file, ChartFile)) {
+            return (
+              <>
+                <p>{file.title}</p>
+                <RadarChart
+                  options={{ captionMargin: 20 }}
+                  captions={file.captions}
+                  data={file.data}
+                  size={600}
+                />
+              </>
+            );
           } else {
             return "File type isn't supported yet.";
           }
@@ -162,7 +222,7 @@ export function App() {
           return "No such file!";
         }
       },
-      "Opens media ",
+      "Opens media.",
     ],
     less: [
       (name) => {
@@ -184,22 +244,17 @@ export function App() {
       "Shows text files' content.",
     ],
     help: [
-      (prompt) => {
-        if (prompt === "cd") {
-          return (
-            <>
-              <p>cd: change directory</p>
-              <p>special directory names</p>
-              <p>~ change to home</p>
-              <p>.. change to one level up</p>
-              <p>- change to the previous directory</p>
-            </>
-          );
-        }
+      () => {
+        const commandsNameMetas = Object.entries(commands).map(
+          ([name, [_, meta]]) => [name, meta]
+        );
         return (
           <>
-            <p>ls: list directory</p>
-            <p>cd: change directory</p>
+            {commandsNameMetas.map(([name, meta]) => (
+              <p>
+                {name}: {meta}
+              </p>
+            ))}
           </>
         );
       },
@@ -207,13 +262,11 @@ export function App() {
     ],
     ls: [
       () => {
-        const currentDirChildren = get(
-          $state.root,
-          $state.currentDirectory,
-          null
-        );
-        if (currentDirChildren !== null) {
-          const nameNodePairs = Object.entries(currentDirChildren)
+        const currentDir = get($state.root, $state.currentDirectory, null);
+        console.log("currentDir", currentDir);
+        console.log("!!!!!!", is(currentDir, Directory))
+        if (is(currentDir, Directory)) {
+          const nameNodePairs = Object.entries(currentDir)
             .sort(([a], [b]) => {
               if (a < b) {
                 return -1;
@@ -224,10 +277,9 @@ export function App() {
               return 0;
             })
             .map(([name, node]) => [name, node]);
-          const dirs =
-            $state.currentDirectory.length === 1
-              ? nameNodePairs
-              : ["..", ...nameNodePairs];
+          const dirs = [[".."], ...nameNodePairs];
+          console.log("dirs", dirs);
+
           return dirs.map(([name, node]) => (
             <NodeView
               currentDirectory={snap.currentDirectory}
@@ -285,7 +337,17 @@ export function App() {
 
   assert(commands, Commands);
 
-  // const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
+  const { setEditorInput, setProcessCurrentLine } = useEditorCommands();
+
+  const ref = useRef();
+
+  useEffect(() => {
+    if (ref.current) {
+      setEditorInput("help");
+      setProcessCurrentLine(true);
+      ref.current.base.focus();
+    }
+  }, [ref]);
 
   const prompt = [...$state.currentDirectory].join("/") + ">";
 
@@ -300,9 +362,12 @@ export function App() {
         ls
       </button> */}
       <ReTerminal
+        ref={ref}
         theme="dracula"
         showControlBar={false}
-        commands={Object.fromEntries(Object.entries(commands).map(([name, [c, _]]) => [name, c]))}
+        commands={Object.fromEntries(
+          Object.entries(commands).map(([name, [c, _]]) => [name, c])
+        )}
         prompt={prompt}
       />
     </>
