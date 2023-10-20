@@ -23,7 +23,10 @@ const root = {
       url: "https://vimeo.com/734324970",
     },
     "about.txt": {
-      contents: "Definitely a software developer. Absolutely a musician. Certainly a curious mind!",
+      contents: "This is my personal playground. It might be buggy at times, but it's always fun. After all, it's the journey that's important, not the destination!",
+    },
+    "who-am-i.txt": {
+      contents: "Definitely a software developer. Undoubtedly a musician. Always a curious mind!"
     },
     projects: {
       "project-1.txt": {
@@ -137,11 +140,7 @@ export function App() {
 
   // Define commands here
   const commands = {
-    open: (name) => {
-      // check if file exists
-      // check if it's video
-      // open
-      // otherwise error
+    open: [(name) => {
       const file = get($state.root, [...snap.currentDirectory, name]);
       if (file) {
         if (is(file, VideoFile)) {
@@ -152,12 +151,8 @@ export function App() {
       } else {
         return "No such file!";
       }
-    },
+    }, "Opens media "],
     less: (name) => {
-      // check if file exists
-      // check if it's video
-      // open
-      // otherwise error
       const file = get($state.root, [...snap.currentDirectory, name]);
       if (file) {
         if (is(file, TextFile)) {
