@@ -28,17 +28,17 @@ const root = {
     "who-am-i.txt": {
       contents: "Definitely a software developer. Undoubtedly a musician. Always a curious mind!"
     },
-    projects: {
-      "project-1.txt": {
-        contents: "Hello world!",
-      },
-      "project-2.txt": {
-        contents: "Hello world!",
-      },
-      "project-3.txt": {
-        contents: "Hello world!",
-      },
-    },
+    // projects: {
+    //   "project-1.txt": {
+    //     contents: "Hello world!",
+    //   },
+    //   "project-2.txt": {
+    //     contents: "Hello world!",
+    //   },
+    //   "project-3.txt": {
+    //     contents: "Hello world!",
+    //   },
+    // },
     expertise: {
       "programming-languages.chart": {
         title: "Programming Languages",
