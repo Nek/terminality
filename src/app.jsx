@@ -1,9 +1,9 @@
 import { ReTerminal, useEditorCommands } from "re-terminal";
 import { proxy, snapshot } from "valtio";
 import { useProxy } from "valtio/utils";
-import ReactPlayer from "react-player";
+import ReactPlayer from "react-player/vimeo";
 import { useState } from "react";
-import { get } from "lodash";
+import get from "lodash/get";
 import { assert, is } from "superstruct";
 
 import {
