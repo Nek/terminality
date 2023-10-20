@@ -6,7 +6,14 @@ import { useState } from "react";
 import { get } from "lodash";
 import { assert, is } from "superstruct";
 
-import { File, Directory, StoreStruct, VideoFile, Commands, TextFile} from "./spec";
+import {
+  File,
+  Directory,
+  StoreStruct,
+  VideoFile,
+  Commands,
+  TextFile,
+} from "./spec";
 
 const SPECIAL_SYMBOLS = {
   HOME: "~",
@@ -23,10 +30,12 @@ const root = {
       url: "https://vimeo.com/734324970",
     },
     "about.txt": {
-      contents: "This is my personal playground. It might be buggy at times, but it's always fun. After all, it's the journey that's important, not the destination!",
+      contents:
+        "This is my personal playground. It might be buggy at times, but it's always fun. After all, it's the journey that's important, not the destination!",
     },
     "who-am-i.txt": {
-      contents: "Definitely a software developer. Undoubtedly a musician. Always a curious mind!"
+      contents:
+        "Definitely a software developer. Undoubtedly a musician. Always a curious mind!",
     },
     // projects: {
     //   "project-1.txt": {
@@ -140,117 +149,138 @@ export function App() {
 
   // Define commands here
   const commands = {
-    open: [(name) => {
-      const file = get($state.root, [...snap.currentDirectory, name]);
-      if (file) {
-        if (is(file, VideoFile)) {
-          return <PausableVideo url={file.url} />;
+    open: [
+      (name) => {
+        const file = get($state.root, [...snap.currentDirectory, name]);
+        if (file) {
+          if (is(file, VideoFile)) {
+            return <PausableVideo url={file.url} />;
+          } else {
+            return "File type isn't supported yet.";
+          }
         } else {
-          return "File type isn't supported yet.";
+          return "No such file!";
         }
-      } else {
-        return "No such file!";
-      }
-    }, "Opens media "],
-    less: (name) => {
-      const file = get($state.root, [...snap.currentDirectory, name]);
-      if (file) {
-        if (is(file, TextFile)) {
-          return <div style={{ fontWeight: "200" }} key={name} id={name}>
-          {file.contents}
-        </div>;
+      },
+      "Opens media ",
+    ],
+    less: [
+      (name) => {
+        const file = get($state.root, [...snap.currentDirectory, name]);
+        if (file) {
+          if (is(file, TextFile)) {
+            return (
+              <div style={{ fontWeight: "200" }} key={name} id={name}>
+                {file.contents}
+              </div>
+            );
+          } else {
+            return "File type isn't supported yet.";
+          }
         } else {
-          return "File type isn't supported yet.";
+          return "No such file!";
         }
-      } else {
-        return "No such file!";
-      }
-    },
-    help: (prompt) => {
-      if (prompt === "cd") {
+      },
+      "Shows text files' content.",
+    ],
+    help: [
+      (prompt) => {
+        if (prompt === "cd") {
+          return (
+            <>
+              <p>cd: change directory</p>
+              <p>special directory names</p>
+              <p>~ change to home</p>
+              <p>.. change to one level up</p>
+              <p>- change to the previous directory</p>
+            </>
+          );
+        }
         return (
           <>
+            <p>ls: list directory</p>
             <p>cd: change directory</p>
-            <p>special directory names</p>
-            <p>~ change to home</p>
-            <p>.. change to one level up</p>
-            <p>- change to the previous directory</p>
           </>
         );
-      }
-      return (
-        <>
-          <p>ls: list directory</p>
-          <p>cd: change directory</p>
-        </>
-      );
-    },
-    ls: () => {
-      const currentDirChildren = get(
-        $state.root,
-        $state.currentDirectory,
-        null
-      );
-      if (currentDirChildren !== null) {
-        const nameNodePairs = Object.entries(currentDirChildren)
-          .sort(([a], [b]) => {
-            if (a < b) {
-              return -1;
-            }
-            if (a > b) {
-              return 1;
-            }
-            return 0;
-          })
-          .map(([name, node]) => [name, node]);
-        const dirs =
-          $state.currentDirectory.length === 1
-            ? nameNodePairs
-            : ["..", ...nameNodePairs];
-        return dirs.map(([name, node]) => (
-          <NodeView
-            currentDirectory={snap.currentDirectory}
-            name={name}
-            node={node}
-          />
-        ));
-      }
-    },
-    cd: (path) => {
-      if (path === SPECIAL_SYMBOLS.PREVIOUS) {
-        if ($state.previousDirectory) {
-          const temp = $state.currentDirectory;
-          $state.currentDirectory = $state.previousDirectory;
-          $state.previousDirectory = temp;
-        }
-        return undefined;
-      }
-      if (path === SPECIAL_SYMBOLS.HOME) {
-        if ($state.previousDirectory) {
-          const temp = $state.currentDirectory;
-          $state.currentDirectory = [SPECIAL_SYMBOLS.HOME];
-          $state.previousDirectory = temp;
-        }
-        return undefined;
-      }
-      if (path) {
-        const newDirectoryOrError = walkPath(
-          path,
+      },
+      "You've guessed it!",
+    ],
+    ls: [
+      () => {
+        const currentDirChildren = get(
+          $state.root,
           $state.currentDirectory,
-          $state.previousDirectory
+          null
         );
-        if (newDirectoryOrError !== "error") {
-          const directoryExists = get($state.root, newDirectoryOrError, false);
-          if (directoryExists) {
-            const temp = $state.currentDirectory;
-            $state.currentDirectory = newDirectoryOrError;
-            $state.previousDirectory = temp;
-            return undefined;
-          }
+        if (currentDirChildren !== null) {
+          const nameNodePairs = Object.entries(currentDirChildren)
+            .sort(([a], [b]) => {
+              if (a < b) {
+                return -1;
+              }
+              if (a > b) {
+                return 1;
+              }
+              return 0;
+            })
+            .map(([name, node]) => [name, node]);
+          const dirs =
+            $state.currentDirectory.length === 1
+              ? nameNodePairs
+              : ["..", ...nameNodePairs];
+          return dirs.map(([name, node]) => (
+            <NodeView
+              currentDirectory={snap.currentDirectory}
+              name={name}
+              node={node}
+            />
+          ));
         }
-        return `Error: directory "${path}" doesn't exist.`;
-      }
-    },
+      },
+      "Lists a directory.",
+    ],
+    cd: [
+      (path) => {
+        if (path === SPECIAL_SYMBOLS.PREVIOUS) {
+          if ($state.previousDirectory) {
+            const temp = $state.currentDirectory;
+            $state.currentDirectory = $state.previousDirectory;
+            $state.previousDirectory = temp;
+          }
+          return undefined;
+        }
+        if (path === SPECIAL_SYMBOLS.HOME) {
+          if ($state.previousDirectory) {
+            const temp = $state.currentDirectory;
+            $state.currentDirectory = [SPECIAL_SYMBOLS.HOME];
+            $state.previousDirectory = temp;
+          }
+          return undefined;
+        }
+        if (path) {
+          const newDirectoryOrError = walkPath(
+            path,
+            $state.currentDirectory,
+            $state.previousDirectory
+          );
+          if (newDirectoryOrError !== "error") {
+            const directoryExists = get(
+              $state.root,
+              newDirectoryOrError,
+              false
+            );
+            if (directoryExists) {
+              const temp = $state.currentDirectory;
+              $state.currentDirectory = newDirectoryOrError;
+              $state.previousDirectory = temp;
+              return undefined;
+            }
+          }
+          return `Error: directory "${path}" doesn't exist.`;
+        }
+      },
+      "Changes directory.",
+    ],
   };
 
   assert(commands, Commands);
@@ -272,7 +302,7 @@ export function App() {
       <ReTerminal
         theme="dracula"
         showControlBar={false}
-        commands={commands}
+        commands={Object.fromEntries(Object.entries(commands).map(([name, [c, _]]) => [name, c]))}
         prompt={prompt}
       />
     </>
